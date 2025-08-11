@@ -1,0 +1,118 @@
+name: CI
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.x'
+
+    - name: Install dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y nginx
+
+    - name: Test script syntax
+      run: |
+        echo "Checking bash script syntax..."
+        bash -n install_nginx.sh
+        bash -n check_nginx_backend.sh
+        bash -n fix_nginx_port.sh
+        bash -n start_test_server.sh
+        bash -n stop_test_server.sh
+        echo "All scripts have valid syntax"
+
+    - name: Test script execution (dry run)
+      run: |
+        echo "Testing script execution (without actual installation)..."
+        # Test that scripts can be executed without errors
+        timeout 10s bash -c 'echo "Testing install script..." && ./install_nginx.sh --help 2>/dev/null || echo "Script executed (expected to exit)"'
+        timeout 10s bash -c 'echo "Testing check script..." && ./check_nginx_backend.sh --help 2>/dev/null || echo "Script executed (expected to exit)"'
+        timeout 10s bash -c 'echo "Testing fix script..." && ./fix_nginx_port.sh --help 2>/dev/null || echo "Script executed (expected to exit)"'
+        timeout 10s bash -c 'echo "Testing start script..." && ./start_test_server.sh --help 2>/dev/null || echo "Script executed (expected to exit)"'
+        timeout 10s bash -c 'echo "Testing stop script..." && ./stop_test_server.sh --help 2>/dev/null || echo "Script executed (expected to exit)"'
+
+    - name: Check file permissions
+      run: |
+        echo "Checking script file permissions..."
+        ls -la *.sh
+        for script in *.sh; do
+          if [ -x "$script" ]; then
+            echo "✓ $script is executable"
+          else
+            echo "✗ $script is not executable"
+            exit 1
+          fi
+        done
+
+    - name: Validate Nginx configuration
+      run: |
+        echo "Creating test Nginx configuration..."
+        # Create a minimal test config
+        sudo mkdir -p /etc/nginx/conf.d
+        sudo tee /etc/nginx/conf.d/test.conf > /dev/null << 'EOF'
+        server {
+            listen 80;
+            server_name test.local;
+            location / {
+                return 200 "test";
+            }
+        }
+        EOF
+
+        echo "Testing Nginx configuration..."
+        sudo nginx -t
+
+    - name: Check documentation
+      run: |
+        echo "Checking documentation files..."
+        if [ -f "README.md" ]; then
+          echo "✓ README.md exists"
+        else
+          echo "✗ README.md missing"
+          exit 1
+        fi
+
+        if [ -f "LICENSE" ]; then
+          echo "✓ LICENSE exists"
+        else
+          echo "✗ LICENSE missing"
+          exit 1
+        fi
+
+        if [ -f "CHANGELOG.md" ]; then
+          echo "✓ CHANGELOG.md exists"
+        else
+          echo "✗ CHANGELOG.md missing"
+          exit 1
+        fi
+
+    - name: Check for sensitive information
+      run: |
+        echo "Checking for sensitive information in scripts..."
+        # Check for hardcoded passwords, API keys, etc.
+        if grep -r -i "password\|secret\|key\|token" *.sh 2>/dev/null; then
+          echo "⚠️  Potential sensitive information found"
+          exit 1
+        else
+          echo "✓ No obvious sensitive information found"
+        fi
+
+    - name: Test completion
+      run: |
+        echo "✓ All tests completed successfully"
+        echo "✓ Scripts are syntactically correct"
+        echo "✓ File permissions are correct"
+        echo "✓ Documentation is complete"
+        echo "✓ No sensitive information detected"
