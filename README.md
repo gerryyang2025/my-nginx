@@ -301,8 +301,17 @@ This project contains the following files:
 |------|-------------|
 | `run_nginx.sh` | Main management script - install, start, stop, restart, reload, status, test |
 | `run_test_server.sh` | Test server management tool for local testing |
-| `nginx.conf` | Nginx reverse proxy configuration file |
+| `gerryyang_proxy.conf` | Nginx reverse proxy configuration template |
 | `README.md` | This documentation file |
+
+### Configuration File
+
+The `gerryyang_proxy.conf` file contains the reverse proxy configuration for the three domains. When you run `./run_nginx.sh install`, this file will be copied to `/etc/nginx/conf.d/gerryyang_proxy.conf` and loaded by Nginx.
+
+You can modify this file to change the proxy settings, then run:
+```bash
+sudo ./run_nginx.sh reload  # Reload configuration without restarting
+```
 
 ### Quick Reference
 

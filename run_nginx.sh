@@ -280,8 +280,14 @@ install_nginx() {
     # Create our Nginx configuration file
     print_status $BLUE "Configuring Nginx reverse proxy..."
     
-    # Create new reverse proxy configuration file
-    cat > "$NGINX_CONF_DIR/gerryyang_proxy.conf" << 'EOF'
+    # Copy project configuration file to Nginx config directory
+    CURRENT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+    if [ -f "$CURRENT_DIR/gerryyang_proxy.conf" ]; then
+        cp "$CURRENT_DIR/gerryyang_proxy.conf" "$NGINX_CONF_DIR/gerryyang_proxy.conf"
+        print_status $GREEN "  Copied gerryyang_proxy.conf to $NGINX_CONF_DIR/"
+    else
+        # Fallback: create configuration from template
+        cat > "$NGINX_CONF_DIR/gerryyang_proxy.conf" << 'EOF'
 # Forward www.gerryyang.com to port 8080
 server {
     listen 80;
@@ -324,6 +330,7 @@ server {
     }
 }
 EOF
+    fi
     
     print_status $GREEN "✓ Nginx configuration file created"
     echo ""
