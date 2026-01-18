@@ -3,103 +3,110 @@
 
 ## Project Overview
 
-This project provides a complete solution for setting up and managing an Nginx reverse proxy server. It includes automated installation scripts, configuration management, testing tools, and diagnostic utilities to help you deploy and maintain a production-ready reverse proxy setup.
+This project provides Nginx reverse proxy configuration files and management scripts to help you set up and manage a multi-domain reverse proxy server.
 
 ### What This Project Does
 
 - **Automated Installation**: One-command installation and configuration of Nginx reverse proxy
 - **Multi-Domain Support**: Configure multiple domains to forward to different backend services
-- **Conflict Resolution**: Automatically detect and resolve common configuration conflicts
 - **Testing Tools**: Built-in test servers to verify your reverse proxy configuration
-- **Diagnostic Tools**: Comprehensive troubleshooting tools for common issues
-- **Production Ready**: Includes error handling, logging, and monitoring capabilities
+- **Service Management**: Start, stop, restart, reload, and monitor Nginx service
 
 ### Key Features
 
 - 🚀 **Quick Setup**: Get a working reverse proxy in minutes with automated scripts
-- 🔧 **Smart Configuration**: Automatically handles Linux distribution differences and common conflicts
+- 🔧 **Cross-Platform**: Supports Debian/Ubuntu and CentOS/RHEL distributions
 - 🧪 **Built-in Testing**: Test your setup before going live with included test servers
-- 🐛 **Easy Troubleshooting**: Comprehensive diagnostic tools for common problems
 - 📚 **Complete Documentation**: Step-by-step guides for both automated and manual setup
 
 This setup configures an Nginx reverse proxy with the following forwarding rules:
 - `www.gerryyang.com` (port 80) -> forwards to `172.19.0.16:8080`
 - `llmnews.gerryyang.com` (port 80) -> forwards to `172.19.0.16:8081`
-
+- `english.gerryyang.com` (port 80) -> forwards to `172.19.0.16:8082`
 
 
 ## Prerequisites
 
 - Linux server (Debian/Ubuntu or CentOS/RHEL/Fedora)
 - Root or sudo privileges
-- Domains `www.gerryyang.com` and `llmnews.gerryyang.com` pointing to your server's IP
-- Target server (172.19.0.16) running services on ports 8080 and 8081
+- Domains `www.gerryyang.com`, `llmnews.gerryyang.com`, and `english.gerryyang.com` pointing to your server's IP
+- Target server (172.19.0.16) running services on ports 8080, 8081, and 8082
 
 ## Quick Installation Method
 
-Use the automatic installation script to install and configure Nginx:
+Use the built-in installation command to install and configure Nginx:
 
 ```bash
-# Add execute permission to the installation script
-chmod +x install_nginx.sh
+# Add execute permission to the script
+chmod +x run_nginx.sh
 
-# Execute the installation script
-sudo ./install_nginx.sh
+# Install and configure Nginx
+sudo ./run_nginx.sh install
 ```
 
-This script will automatically:
+This command will automatically:
 1. Detect your Linux distribution and install Nginx
 2. Handle and resolve configuration conflicts
 3. Configure Nginx multi-domain reverse proxy
    - www.gerryyang.com -> 172.19.0.16:8080
    - llmnews.gerryyang.com -> 172.19.0.16:8081
+   - english.gerryyang.com -> 172.19.0.16:8082
 4. Start and confirm the service is running normally
 5. Verify that port 80 is open
 
+### Service Management
+
+After installation, you can use the `run_nginx.sh` script to manage the Nginx service:
+
+```bash
+# Start Nginx service
+sudo ./run_nginx.sh start
+
+# Check service status
+sudo ./run_nginx.sh status
+
+# Stop Nginx service
+sudo ./run_nginx.sh stop
+
+# Restart Nginx service
+sudo ./run_nginx.sh restart
+
+# Reload configuration (graceful)
+sudo ./run_nginx.sh reload
+
+# Test configuration syntax
+sudo ./run_nginx.sh test
+```
+
 ## Testing Tools
 
-To test whether the reverse proxy configuration is working properly, we provide several useful tools:
+To test whether the reverse proxy configuration is working properly, we provide the test server management tool.
 
-### 1. Test Server Startup Tool
+### Test Server Management Tool
 
-This tool will start test web servers on ports 8080 and 8081 to verify Nginx reverse proxy functionality (only for local testing):
+This tool provides unified management for test web servers. It supports starting, stopping, restarting, and checking the status of test servers on ports 8080, 8081, and 8082:
 
 ```bash
 # Add execute permission to the script
-chmod +x start_test_server.sh
+chmod +x run_test_server.sh
 
 # Start test web servers
-./start_test_server.sh
+./run_test_server.sh start
+
+# Check test server status
+./run_test_server.sh status
+
+# Stop test web servers
+./run_test_server.sh stop
+
+# Restart test web servers
+./run_test_server.sh restart
 ```
 
 After startup, you can access test pages at the following addresses:
 - http://www.gerryyang.com - Should display pages from port 8080
 - http://llmnews.gerryyang.com - Should display pages from port 8081
-
-### 2. Stop Test Server
-
-Use the following command to stop the test web servers:
-
-```bash
-chmod +x stop_test_server.sh
-./stop_test_server.sh
-```
-
-### 3. Nginx 502 Error Diagnostic Tool
-
-If you encounter a "502 Bad Gateway" error, you can use this tool to diagnose the problem:
-
-```bash
-chmod +x check_nginx_backend.sh
-sudo ./check_nginx_backend.sh
-```
-
-This script will:
-- Check Nginx service status
-- Check if backend servers (ports 8080 and 8081 on 172.19.0.16) are reachable
-- Analyze Nginx error logs
-- Test network connectivity
-- Provide repair suggestions
+- http://english.gerryyang.com - Should display pages from port 8082
 
 ## Common Problem Solutions
 
@@ -107,7 +114,7 @@ This script will:
 
 If you encounter a "502 Bad Gateway" error when accessing the website, it's usually because:
 
-1. **Backend service not running**: Ensure services are running on ports 8080 and 8081 of 172.19.0.16
+1. **Backend service not running**: Ensure services are running on ports 8080, 8081, and 8082 of 172.19.0.16
    ```bash
    # Check if connection is reachable
    ping 172.19.0.16
@@ -115,6 +122,7 @@ If you encounter a "502 Bad Gateway" error when accessing the website, it's usua
    # Test port connectivity
    nc -zv 172.19.0.16 8080
    nc -zv 172.19.0.16 8081
+   nc -zv 172.19.0.16 8082
    ```
 
 2. **Firewall settings**: Check if firewall allows connections to target server
@@ -145,11 +153,20 @@ Or:
 nginx: [emerg] bind() to 0.0.0.0:8080 failed (98: Address already in use)
 ```
 
-You can use the provided port conflict fix tool:
+You can manually resolve the conflict:
 
 ```bash
-chmod +x fix_nginx_port.sh
-sudo ./fix_nginx_port.sh
+# Check what is using the port
+sudo lsof -i :80
+
+# Stop any process using port 80
+sudo fuser -k 80/tcp
+
+# Stop conflicting service
+sudo systemctl stop <service-name>
+
+# Restart Nginx
+sudo ./run_nginx.sh restart
 ```
 
 ## Manual Configuration Steps
@@ -213,72 +230,107 @@ If you don't want to use the automatic script, you can configure manually follow
            proxy_set_header X-Forwarded-Proto $scheme;
        }
    }
+
+   # Forward english.gerryyang.com to port 8082
+   server {
+       listen 80;
+       server_name english.gerryyang.com;
+
+       location / {
+           proxy_pass http://172.19.0.16:8082;
+           proxy_set_header Host $host;
+           proxy_set_header X-Real-IP $remote_addr;
+           proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+           proxy_set_header X-Forwarded-Proto $scheme;
+       }
+   }
    ```
 
 4. **Test and apply configuration**
 
    ```bash
    # Test configuration file
-   sudo nginx -t
+   sudo ./run_nginx.sh test
+   # Or: sudo nginx -t
 
    # Restart Nginx
-   sudo systemctl restart nginx
+   sudo ./run_nginx.sh restart
+   # Or: sudo systemctl restart nginx
+
+   # Enable Nginx at boot
    sudo systemctl enable nginx
    ```
 
 ## Usage
 
-- Ensure services on target server (172.19.0.16) are running on ports 8080 and 8081 respectively
+- Ensure services on target server (172.19.0.16) are running on ports 8080, 8081, and 8082 respectively
 - Access services through:
   - `http://www.gerryyang.com` -> Access service on 172.19.0.16:8080
   - `http://llmnews.gerryyang.com` -> Access service on 172.19.0.16:8081
+  - `http://english.gerryyang.com` -> Access service on 172.19.0.16:8082
 
 ## Troubleshooting
 
 If services cannot be accessed normally after configuration, try the following steps:
 
-- Check if Nginx is running: `systemctl status nginx`
+- Check if Nginx is running: `sudo ./run_nginx.sh status` or `systemctl status nginx`
 - View Nginx error logs: `sudo tail -f /var/log/nginx/error.log`
 - Check if firewall allows port 80: `sudo ufw status` or `sudo firewall-cmd --list-all`
+- Restart Nginx service: `sudo ./run_nginx.sh restart`
+- Reload configuration: `sudo ./run_nginx.sh reload`
+- Test configuration syntax: `sudo ./run_nginx.sh test`
 - Confirm domain resolution is correct:
   ```bash
   ping www.gerryyang.com
   ping llmnews.gerryyang.com
+  ping english.gerryyang.com
   ```
 - Ensure target server is reachable and running services on corresponding ports:
   ```bash
   ping 172.19.0.16
   nc -zv 172.19.0.16 8080
   nc -zv 172.19.0.16 8081
+  nc -zv 172.19.0.16 8082
   ```
-- Use diagnostic tool: `sudo ./check_nginx_backend.sh`
 
+## Project Files
 
-## Community and Support
+This project contains the following files:
 
-### 🤝 Contributing
-We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) for details on how to:
-- Report bugs and request features
-- Submit code changes
-- Follow our coding standards
-- Test your contributions
+| File | Description |
+|------|-------------|
+| `run_nginx.sh` | Main management script - install, start, stop, restart, reload, status, test |
+| `run_test_server.sh` | Test server management tool for local testing |
+| `nginx.conf` | Nginx reverse proxy configuration file |
+| `README.md` | This documentation file |
 
-### 📋 Issue Templates
-- [Bug Report](.github/ISSUE_TEMPLATE/bug_report.md) - For reporting problems
-- [Feature Request](.github/ISSUE_TEMPLATE/feature_request.md) - For suggesting improvements
+### Quick Reference
 
-### 🔒 Security
-- Found a security vulnerability? Please report it privately to [security@gerryyang.com](mailto:security@gerryyang.com)
-- See our [Security Policy](SECURITY.md) for more details
+```bash
+# Install and configure Nginx
+sudo ./run_nginx.sh install
 
-### 📖 Project Documentation
-- [Code of Conduct](CODE_OF_CONDUCT.md) - Community behavior standards
-- [Changelog](CHANGELOG.md) - Version history and updates
-- [License](LICENSE) - MIT License for open source use
+# Manage Nginx service
+sudo ./run_nginx.sh start      # Start Nginx
+sudo ./run_nginx.sh stop       # Stop Nginx
+sudo ./run_nginx.sh restart    # Restart Nginx
+sudo ./run_nginx.sh reload     # Reload configuration
+sudo ./run_nginx.sh status     # Check service status
+sudo ./run_nginx.sh test       # Test configuration syntax
 
-### 🚀 CI/CD
-- Automated testing on every pull request
-- Syntax checking and validation
-- Cross-platform compatibility testing
-- Security scanning for sensitive information
+# Manage test servers (for local testing)
+./run_test_server.sh start   # Start test servers on ports 8080, 8081, 8082
+./run_test_server.sh stop    # Stop test servers
+./run_test_server.sh status  # Check test server status
+```
 
+## License
+
+This project is licensed under the MIT License.
+
+## Support
+
+For issues and questions, please:
+1. Check this README documentation
+2. Use `./run_nginx.sh help` for command reference
+3. Check Nginx error logs: `sudo tail -f /var/log/nginx/error.log`
