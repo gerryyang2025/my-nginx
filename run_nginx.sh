@@ -3,11 +3,11 @@
 # Nginx Reverse Proxy Management Script
 # 
 # Usage:
-#   ./run_nginx.sh install   - Install and configure Nginx reverse proxy
-#   ./run_nginx.sh start     - Start Nginx service
+#   ./run_nginx.sh install   - Install and configure Nginx
+#   ./run_nginx.sh start     - Start Nginx service (auto-sync config if needed)
 #   ./run_nginx.sh stop      - Stop Nginx service
-#   ./run_nginx.sh restart   - Restart Nginx service
-#   ./run_nginx.sh reload    - Reload Nginx configuration (graceful)
+#   ./run_nginx.sh restart   - Restart Nginx service (auto-sync config if needed)
+#   ./run_nginx.sh reload    - Reload configuration (auto-sync config if needed)
 #   ./run_nginx.sh status    - Check Nginx service status
 #   ./run_nginx.sh test      - Test Nginx configuration syntax
 #   ./run_nginx.sh help      - Show this help message
@@ -38,17 +38,7 @@ check_root() {
 check_nginx_installed() {
     if ! command -v nginx &> /dev/null; then
         print_status $RED "Error: Nginx is not installed on this system"
-        print_status $YELLOW "Please run './run_nginx.sh install' first or install Nginx manually"
-        exit 1
-    fi
-}
-
-# Function to check if Nginx configuration exists
-check_nginx_config() {
-    NGINX_CONF_DIR="/etc/nginx/conf.d"
-    if [ ! -f "$NGINX_CONF_DIR/gerryyang_proxy.conf" ]; then
-        print_status $RED "Error: Nginx configuration not found"
-        print_status $YELLOW "Please run './run_nginx.sh install' first to set up the configuration"
+        print_status $YELLOW "Please run './run_nginx.sh install' first to install Nginx"
         exit 1
     fi
 }
@@ -213,9 +203,9 @@ test_nginx() {
     fi
 }
 
-# Function to install and configure Nginx
-install_nginx() {
-    print_status $BLUE "Installing and configuring Nginx reverse proxy service..."
+# Function to install Nginx only (without configuration)
+install_nginx_only() {
+    print_status $BLUE "Installing Nginx..."
     echo ""
     
     # Detect Linux distribution
@@ -247,12 +237,19 @@ install_nginx() {
     
     print_status $GREEN "✓ Nginx installed successfully"
     echo ""
+}
+
+# Function to sync configuration to Nginx
+sync_config() {
+    print_status $BLUE "Synchronizing Nginx configuration..."
+    echo ""
+    
+    NGINX_CONF_DIR="/etc/nginx/conf.d"
     
     # Handle default configuration files to avoid port conflicts
     print_status $BLUE "Processing default configuration to avoid port conflicts..."
     if [ -d "/etc/nginx/sites-enabled" ]; then
         # For Debian/Ubuntu systems
-        # Check and backup default site configuration
         if [ -f "/etc/nginx/sites-enabled/default" ]; then
             cp /etc/nginx/sites-enabled/default /etc/nginx/sites-enabled/default.bak
             rm -f /etc/nginx/sites-enabled/default
@@ -265,7 +262,6 @@ install_nginx() {
     fi
     
     # Ensure conf.d directory exists
-    NGINX_CONF_DIR="/etc/nginx/conf.d"
     if [ ! -d "$NGINX_CONF_DIR" ]; then
         mkdir -p "$NGINX_CONF_DIR"
     fi
@@ -287,10 +283,9 @@ install_nginx() {
         done
     fi
     
-    # Create our Nginx configuration file
-    print_status $BLUE "Configuring Nginx reverse proxy..."
-    
     # Copy project configuration file to Nginx config directory
+    print_status $BLUE "Copying configuration to $NGINX_CONF_DIR/..."
+    
     CURRENT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
     if [ -f "$CURRENT_DIR/gerryyang_proxy.conf" ]; then
         cp "$CURRENT_DIR/gerryyang_proxy.conf" "$NGINX_CONF_DIR/gerryyang_proxy.conf"
@@ -349,7 +344,6 @@ EOF
         print_status $YELLOW "  Warning: /etc/nginx/nginx.conf does not include conf.d directory"
         print_status $BLUE "  Attempting to add include statement..."
         
-        # Check if http block exists and add include statement
         if grep -q "^http {" /etc/nginx/nginx.conf; then
             sed -i '/^http {/a\    include /etc/nginx/conf.d/*.conf;' /etc/nginx/nginx.conf
             print_status $GREEN "  Added include statement to http block"
@@ -361,24 +355,18 @@ EOF
         print_status $GREEN "  Nginx main config includes conf.d directory"
     fi
     
-    print_status $GREEN "✓ Nginx configuration file created"
-    echo ""
-    
-    # Test Nginx configuration
+    # Test configuration
     print_status $BLUE "Testing Nginx configuration..."
     if ! nginx -t 2>&1; then
         print_status $YELLOW "Configuration test failed, attempting to fix common issues..."
         
-        # Fix possible configuration issues
         NGINX_CONFIG_ERROR=$(nginx -t 2>&1)
         
         if echo "$NGINX_CONFIG_ERROR" | grep -q "duplicate.*default server"; then
             print_status $BLUE "Detected default server conflict, attempting to fix..."
             
-            # Remove default_server flag from our configuration (if exists)
             sed -i 's/listen 80 default_server;/listen 80;/g' "$NGINX_CONF_DIR/gerryyang_proxy.conf"
             
-            # If problem is in other files, try to backup and disable conflicting files
             ERROR_FILE=$(echo "$NGINX_CONFIG_ERROR" | grep -oE '/[^ ]+:[0-9]+' | cut -d':' -f1 | head -1)
             if [ -n "$ERROR_FILE" ] && [ -f "$ERROR_FILE" ]; then
                 print_status $BLUE "Backing up and disabling conflicting file: $ERROR_FILE"
@@ -386,7 +374,6 @@ EOF
                 mv "$ERROR_FILE" "${ERROR_FILE}.disabled"
             fi
             
-            # Test configuration again
             if ! nginx -t 2>&1; then
                 print_status $RED "✗ Automatic fix failed"
                 echo "Please check Nginx configuration manually"
@@ -400,51 +387,34 @@ EOF
     fi
     
     print_status $GREEN "✓ Configuration test passed"
+    print_status $GREEN "✓ Configuration synchronized successfully"
     echo ""
-    
-    # Start Nginx service
-    print_status $BLUE "Starting Nginx service..."
-    
-    if systemctl is-active --quiet nginx; then
-        print_status $YELLOW "Nginx is already running, restarting..."
-        systemctl restart nginx
+}
+
+# Function to install Nginx (install + sync config)
+install_nginx() {
+    # Check if Nginx is already installed
+    if command -v nginx &> /dev/null; then
+        print_status $YELLOW "Nginx is already installed"
+        print_status $BLUE "Running configuration sync only..."
+        sync_config
     else
-        systemctl start nginx
+        install_nginx_only
+        sync_config
     fi
     
-    # Enable Nginx at boot
-    systemctl enable nginx > /dev/null 2>&1
-    
-    # Check if Nginx is running
-    if pgrep -x "nginx" > /dev/null; then
-        print_status $GREEN "✓ Nginx service started successfully"
-    else
-        print_status $RED "✗ Nginx service failed to start"
-        print_status $YELLOW "Please check error logs: /var/log/nginx/error.log"
-        exit 1
-    fi
-    
-    # Check if port 80 is open
-    sleep 1
-    if ss -tuln | grep -q ':80 '; then
-        print_status $GREEN "✓ Port 80 is open"
-    else
-        print_status $YELLOW "⚠ Warning: Port 80 doesn't seem to be listening"
-    fi
-    
-    echo ""
     echo "====================================================="
-    print_status $GREEN "Nginx reverse proxy installation completed!"
+    print_status $GREEN "Nginx installation completed!"
     echo ""
     echo "Configured forwarding rules:"
     echo "  - http://www.gerryyang.com -> 172.19.0.16:8080"
     echo "  - http://llmnews.gerryyang.com -> 172.19.0.16:8081"
-    echo "  - http://english.gerryyang.com -> 172.19.0.16:8082"
-    echo ""
-    echo "Next steps:"
+    echo "  - http://english.gerryyang.com -> 172.19.0.16    echo ""
+   :8082"
+ echo "Next steps:"
     echo "  1. Ensure the relevant domains are correctly resolved to your server IP"
     echo "  2. Ensure services are running on 172.19.0.16:8080, 8081, 8082"
-    echo "  3. Use './run_nginx.sh status' to check service status"
+    echo "  3. Use './run_nginx.sh start' to start Nginx service"
     echo "====================================================="
 }
 
@@ -455,11 +425,11 @@ show_help() {
     echo "Usage: $0 <command>"
     echo ""
     echo "Commands:"
-    echo "  install   - Install and configure Nginx reverse proxy"
-    echo "  start     - Start Nginx service"
+    echo "  install   - Install and configure Nginx"
+    echo "  start     - Start Nginx service (auto-sync config if needed)"
     echo "  stop      - Stop Nginx service"
-    echo "  restart   - Restart Nginx service"
-    echo "  reload    - Reload Nginx configuration (graceful)"
+    echo "  restart   - Restart Nginx service (auto-sync config if needed)"
+    echo "  reload    - Reload configuration (auto-sync config if needed)"
     echo "  status    - Check Nginx service status"
     echo "  test      - Test Nginx configuration syntax"
     echo "  help      - Show this help message"
@@ -484,7 +454,7 @@ main() {
         start)
             check_root
             check_nginx_installed
-            check_nginx_config
+            sync_config
             start_nginx
             ;;
         stop)
@@ -495,13 +465,13 @@ main() {
         restart)
             check_root
             check_nginx_installed
-            check_nginx_config
+            sync_config
             restart_nginx
             ;;
         reload)
             check_root
             check_nginx_installed
-            check_nginx_config
+            sync_config
             reload_nginx
             ;;
         status)
