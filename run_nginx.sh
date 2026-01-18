@@ -38,7 +38,7 @@ check_root() {
 check_nginx_installed() {
     if ! command -v nginx &> /dev/null; then
         print_status $RED "Error: Nginx is not installed on this system"
-        print_status $YELLOW "Please run install_nginx.sh first or install Nginx manually"
+        print_status $YELLOW "Please run './run_nginx.sh install' first or install Nginx manually"
         exit 1
     fi
 }
