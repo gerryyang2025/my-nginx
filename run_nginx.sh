@@ -3,14 +3,14 @@
 # Nginx Reverse Proxy Management Script
 # 
 # Usage:
-#   ./run.sh install   - Install and configure Nginx reverse proxy
-#   ./run.sh start     - Start Nginx service
-#   ./run.sh stop      - Stop Nginx service
-#   ./run.sh restart   - Restart Nginx service
-#   ./run.sh reload    - Reload Nginx configuration (graceful)
-#   ./run.sh status    - Check Nginx service status
-#   ./run.sh test      - Test Nginx configuration syntax
-#   ./run.sh help      - Show this help message
+#   ./run_nginx.sh install   - Install and configure Nginx reverse proxy
+#   ./run_nginx.sh start     - Start Nginx service
+#   ./run_nginx.sh stop      - Stop Nginx service
+#   ./run_nginx.sh restart   - Restart Nginx service
+#   ./run_nginx.sh reload    - Reload Nginx configuration (graceful)
+#   ./run_nginx.sh status    - Check Nginx service status
+#   ./run_nginx.sh test      - Test Nginx configuration syntax
+#   ./run_nginx.sh help      - Show this help message
 
 # Color codes for output
 RED='\033[0;31m'
@@ -39,6 +39,16 @@ check_nginx_installed() {
     if ! command -v nginx &> /dev/null; then
         print_status $RED "Error: Nginx is not installed on this system"
         print_status $YELLOW "Please run './run_nginx.sh install' first or install Nginx manually"
+        exit 1
+    fi
+}
+
+# Function to check if Nginx configuration exists
+check_nginx_config() {
+    NGINX_CONF_DIR="/etc/nginx/conf.d"
+    if [ ! -f "$NGINX_CONF_DIR/gerryyang_proxy.conf" ]; then
+        print_status $RED "Error: Nginx configuration not found"
+        print_status $YELLOW "Please run './run_nginx.sh install' first to set up the configuration"
         exit 1
     fi
 }
@@ -330,6 +340,25 @@ server {
     }
 }
 EOF
+        print_status $GREEN "  Created gerryyang_proxy.conf from template"
+    fi
+    
+    # Verify that Nginx main config includes conf.d directory
+    print_status $BLUE "Verifying Nginx configuration..."
+    if ! grep -q "include.*conf\.d" /etc/nginx/nginx.conf 2>/dev/null; then
+        print_status $YELLOW "  Warning: /etc/nginx/nginx.conf does not include conf.d directory"
+        print_status $BLUE "  Attempting to add include statement..."
+        
+        # Check if http block exists and add include statement
+        if grep -q "^http {" /etc/nginx/nginx.conf; then
+            sed -i '/^http {/a\    include /etc/nginx/conf.d/*.conf;' /etc/nginx/nginx.conf
+            print_status $GREEN "  Added include statement to http block"
+        else
+            print_status $RED "  Could not find http block in nginx.conf"
+            print_status $YELLOW "  Please manually add 'include /etc/nginx/conf.d/*.conf;' to nginx.conf"
+        fi
+    else
+        print_status $GREEN "  Nginx main config includes conf.d directory"
     fi
     
     print_status $GREEN "✓ Nginx configuration file created"
@@ -415,7 +444,7 @@ EOF
     echo "Next steps:"
     echo "  1. Ensure the relevant domains are correctly resolved to your server IP"
     echo "  2. Ensure services are running on 172.19.0.16:8080, 8081, 8082"
-    echo "  3. Use './run.sh status' to check service status"
+    echo "  3. Use './run_nginx.sh status' to check service status"
     echo "====================================================="
 }
 
@@ -455,6 +484,7 @@ main() {
         start)
             check_root
             check_nginx_installed
+            check_nginx_config
             start_nginx
             ;;
         stop)
@@ -465,11 +495,13 @@ main() {
         restart)
             check_root
             check_nginx_installed
+            check_nginx_config
             restart_nginx
             ;;
         reload)
             check_root
             check_nginx_installed
+            check_nginx_config
             reload_nginx
             ;;
         status)
